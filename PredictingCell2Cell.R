@@ -1,5 +1,3 @@
-setwd("~/Documents/BAS479/FinalCase")
-
 # function to combine infrequent levels in a variable for better fit in a model
 combine_infrequent_levels <- function(x,threshold=20,newname="Combined") { 
   x <- factor(x)
@@ -117,12 +115,6 @@ subset(MISSING,MissingInTRAIN>0 | MissingInHOLDOUT>0 )  # variables that have mi
 #look at the pattern of missingness
 md.pattern(TRAIN[,c("MonthlyRevenue","MonthlyMinutes","TotalRecurringCharge","DirectorAssistedCalls","OverageMinutes",
                     "RoamingCalls","PercChangeMinutes","PercChangeRevenues","AgeHH1","AgeHH2")])  
-########################
-#Only 3 missing patterns.  
-#1)  Call details are either all present or all missing (same with Percentchanges)
-#2)  Call details are always missing when percent is missing.
-#3)  Ages are always missing or always present, but this is unrelated to other missingness
-########################
 
 #Looking if missingness itself a predictor of churn?
 # MonthlyMinutes
@@ -165,17 +157,7 @@ mosaic(TRAIN$Churn~is.na(TRAIN$AgeHH2) ,equal=TRUE)
 fisher.test(TRAIN$Churn,is.na(TRAIN$AgeHH1))  #NOT significant
 mosaic(TRAIN$Churn~is.na(TRAIN$AgeHH1) ,equal=TRUE)
 
-
-
-#Missingness of account information is an important predictor of churn.  This is somewhat fishy.  There may be some
-#response leakage here?
-
-#Suggesetion:  replace missing values with median and create a new columns for missingness
-
-#Missingness of age is not an important predictor of churn.
-
-#Suggestion:  replace missing values with median
-
+########
 # Because missingness is an important factor in predicting churn. 
 # We'll create new columns for missingness and replace missing values with its median for each variable
 # Process data together
@@ -194,7 +176,8 @@ for( columns in MISSING$Column[which(MISSING$MissingInTRAIN>0)] ) {
   replacement.value <- median(CELL[-missing.positions,columns])
   CELL[missing.positions,columns] <- replacement.value
 }
-
+########
+                                                          
 # Handling rare levels
 service <- as.character(CELL$ServiceArea)
 head(service) # [1] "SEAPOR503" "PITHOM412" "MILMIL414" "PITHOM412" "OKCTUL918" "OKCTUL918"
@@ -287,79 +270,6 @@ SUBTRAIN <- FULLTRAIN[subtrain.rows,]
 SUBHOLDOUT <- FULLTRAIN[-subtrain.rows,]
 
 
-############################################################################################################
-########################### lurking variable
-############################################################################################################
-L_TRAIN <- FULLTRAIN
-
-L_TRAIN$Churn <- as.numeric(L_TRAIN$Churn) - 1   # yes=1, no=0
-aggregate(Churn~IncomeGroup,data=L_TRAIN,FUN=mean)
-AOV <- aov(Churn~IncomeGroup,data=L_TRAIN)
-summary(AOV)
-TUKEY <- TukeyHSD(AOV)
-TUKEY
-library(multcompView)
-multcompLetters4(AOV,TUKEY)
-# IncomeGroup     Churn
-# 1            0 0.3022984
-# 2            1 0.2913193
-# 3            2 0.2963272
-# 4            3 0.2631227
-# 5            4 0.2765852
-# 6            5 0.2827311
-# 7            6 0.2835432
-# 8            7 0.2979411
-# 9            8 0.2765065
-# 10           9 0.2820421
-# $IncomeGroup
-# 0    7    2    1    6    5    9    4    8    3 
-# "a"  "a" "ab" "ab" "ab" "ab" "ab" "ab" "ab"  "b" 
-cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
-registerDoParallel(cluster)
-RF <- randomForest(Churn~.-IncomeGroup,data=L_TRAIN)
-stopCluster(cluster)
-registerDoSEQ()
-r <- L_TRAIN$Churn - predict(RF)
-aggregate(r~L_TRAIN$IncomeGroup,FUN=mean)
-AOV <- aov(r~CUSTLOYALTY$Income)
-summary(AOV)
-TUKEY <- TukeyHSD(AOV)
-multcompLetters4(AOV,TUKEY)  
-
-
-aggregate(Churn~ChildrenInHH,data=FULLTRAIN,FUN=mean)
-AOV <- aov(Churn~ChildrenInHH,data=FULLTRAIN)
-summary(AOV)
-
-aggregate(Churn~HandsetRefurbished,data=FULLTRAIN,FUN=mean)
-AOV <- aov(Churn~HandsetRefurbished,data=FULLTRAIN)
-summary(AOV)
-RF <- randomForest(Churn~.-HandsetRefurbished,data=FULLTRAIN)
-
-r <- CELL$Churn - predict(RF)
-t.test(r~CELL$Churn)
-
-aggregate(Churn~HandsetWebCapable,data=CELL,FUN=mean)
-AOV <- aov(Churn~HandsetWebCapable,data=CELL)
-summary(AOV)
-
-aggregate(Churn~TruckOwner,data=CELL,FUN=mean)
-AOV <- aov(Churn~TruckOwner,data=CELL)
-summary(AOV)
-
-RF <- randomForest(Churn~.-ChildrenInHH,data=CELL)
-r <- CELL$Churn - predict(RF)
-t.test(r~CELL$Churn)
-
-
-
-DOG$OutcomeType <- as.numeric(DOG$OutcomeType) - 1 # Eu=1, adopt=0
-aggregate(OutcomeType~Breed, data=DOG, FUN=mean)
-AOV <- aov(OutcomeType~Breed,data=DOG)
-summary(AOV)
-
-
-
 ######################################### PREDICTIVE MODEL ######################################### 
 ######################################### ######################################### ######################################### 
 ######################################### ######################################### ######################################### 
@@ -420,20 +330,6 @@ head(FORESTfit.new.predictions)
 FORESTfit.new.predictions$CustomerID <- HOLDOUT$CustomerID
 FORESTfit.new.predictions$Churn <- FORESTfit.new.predictions$Yes
 FORESTfit.new.predictions <- FORESTfit.new.predictions[-c(1:2)]
-head(FORESTfit.new.predictions)
-dim(FORESTfit.new.predictions)
-
-
-write.csv(FORESTfit.new.predictions,file="SineenartFinalPrediction.csv",row.names = FALSE)
-
-
-
-
-
-
-
-
-
 
 ##########################################################################
 #                               BOOSTED TREE 
@@ -459,91 +355,30 @@ GBMfit$results[rownames(GBMfit$bestTune),]   #.68
 #     shrinkage interaction.depth n.minobsinnode n.trees       ROC      Sens      Spec      ROCSD      SensSD     SpecSD
 # 36      0.01                 4             10    2000 0.6842619 0.9680758 0.1170632 0.00715037 0.002630766 0.00130764
 
-SUBTRAIN$CurrentEquipmentDays
-varImp(GBMfit)
-
-MadeCallToRetentionTeamYes  11.623
-MissingPercentMinYes 
-Regiond
-SUBTRAIN$CurrentEquipmentDays
-
-GBMfit
-GBMfit.predictions <- predict(GBMfit,newdata=HOLDOUT,type="prob")
-head(GBMfit.predictions)
-
-GBMfit.predictions$CustomerID <- HOLDOUT$CustomerID
-GBMfit.predictions$Churn <- GBMfit.predictions$Yes
-GBMfit.predictions <- GBMfit.predictions[-c(1:2)]
-head(GBMfit.predictions)
-dim(GBMfit.predictions)
 
 
-write.csv(GBMfit.predictions,file="SineenartFinalPredictionGMBfit.csv",row.names = FALSE)
-
-
-#####################################
-#K-nearest neighbors
-#####################################
-# 
-# #convert_categorical will take a data frame and replace categorical variables with sets of indicator variables
-# #Need to specify which variable is the y variable.  
-# convert_categorical <- function(DATA,y=NA,denominator=1) {
-#   if(is.na(y)) { stop("Must specify a y variable in quotes") }
-#   to.convert <- setdiff( which(unlist(lapply(DATA,class))=="factor"), which(names(DATA)==y) )  #column numbers of categorical variables
-#   if(length(to.convert)==0) { return(DATA) } #nothing to be done
-#   for (i in to.convert) {  #loop over non-numerical columns
-#     formula <- as.formula( paste("~",names(DATA)[i],"-1",sep="") )  #set up formula for model.matrix
-#     INDICATORS <- data.frame(model.matrix(formula,data=DATA))/denominator
-#     DATA <- cbind(DATA,INDICATORS) #add columns for the indicator variables
-#   }
-#   DATA <- DATA[,-to.convert[-1]] #Get rid of categorical variables
-# }
-# #Tune values for number of neighbors
-# paramGrid <- expand.grid(k=3:5)   
-# set.seed(seed)
-# TRAIN.NN <- TRAIN
-# TRAIN.NN <- convert_categorical(TRAIN.NN,y="Churn")
-# TRAIN.NN$Category <- NULL
-# cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
-# registerDoParallel(cluster)
-# #AUC
-# KNN <- train(Churn~.,data=TRAIN, metric="ROC", method='knn', trControl=fitControl,tuneGrid=paramGrid)
-# stopCluster(cluster)
-# registerDoSEQ()
-# KNN
-# BEST$knn<-KNN$bestTune
-
-
-
-
-
-
+########
+                                                          
 MASTERRESULTS <- rbind(RPARTfit$results[,2:7],
                        FORESTfit.new$results[,2:7],
-                       GBMfit$results[,5:10])   ##
-# KNN$results[,2:7])  ##
+                       GBMfit$results[,5:10])
 
 MASTERRESULTS$method <- c(rep("rpart",nrow(RPARTfit$results)),
                           rep("randomforest",nrow(FORESTfit.new$results)),
                           rep("gbm",nrow(GBMfit$results)))
-# rep("knn",nrow(KNN$results)))
 
 MASTERRESULTS$param <- c(RPARTfit$results$cp,
                          FORESTfit.new$results$mtry,
                          paste(GBMfit$results$n.trees,GBMfit$results$shrinkage,GBMfit$results$interaction.depth,GBMfit$results$n.minobsinnode,sep=";"))
-# KNN$results$k)
-# 
-# ##Look at results        #####################
-# head( MASTERRESULTS[order(MASTERRESULTS$Accuracy,decreasing=TRUE),], 20 )
-# 
+# Looking at the results
 head( MASTERRESULTS[order(MASTERRESULTS$ROC,decreasing=TRUE),], 20 )
 # 
 # head( MASTERRESULTS[order(MASTERRESULTS$ROC,decreasing=TRUE),], 20 ) 
 
 holdout.classifications <- predict(FORESTfit.new,newdata=HOLDOUT)  #classes
-head(HOLDOUT)
+
 mean(holdout.classifications==HOLDOUT$Churn)  #accuracy on holdout
-head(HOLDOUT)
+
 holdout.predictions <- predict(FORESTfit.new,newdata=HOLDOUT,type="prob")  #probabilities   !!!!!!!!!!!
 
 library(pROC)
@@ -603,81 +438,10 @@ GLMnet.predictions <- predict(GLMnet,newdata=SS,type="prob")
 dim(GLMnet.predictions)
 holdout.predictions <- holdout.predictions[,2]
 write.csv(holdout.predictions,file="SineenartFinalPrediction.csv",row.names = TRUE)
-?write.csv
-
 
 NNET$bestTune
 NNET$results[rownames(NNET$bestTune),] #0.9344 for me
 NNET.predictions <- predict(NNET,newdata=HOLDOUT.TO.SHARE,type="prob")
 dim(NNET.predictions)  #verify 4986 rows
 write.csv(NNET.predictions,file="SineenartFinalPredictions.csv",row.names = FALSE)
-
-
-#### XG Boost
-fitControl <- trainControl(method="cv",number=5, verboseIter = TRUE,
-                           summaryFunction = twoClassSummary, classProbs = TRUE, allowParallel = TRUE, returnData = FALSE) 
-?trainControl
-#fitControl <- trainControl(method = "cv", number = 5, classProbs = TRUE, verboseIter = TRUE)
-xgboostGrid <- expand.grid(eta=0.1,nrounds=c(100,200,500,1000,1500),
-                           max_depth=5,min_child_weight=1,gamma=0,colsample_bytree=0.8,subsample=0.8)
-TRAINXGB <- SUBTRAIN
-TRAINXGB$Churn <- as.numeric(TRAINXGB$Churn)-1
-TRAINXGB <- sparse.model.matrix(Churn~.-1,data=TRAINXGB)
-cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
-registerDoParallel(cluster)
-XTREME <- train(x=TRAINXGB,y=SUBTRAIN$Churn,
-                method="xgbTree",
-                trControl=fitControl,
-                tuneGrid=xgboostGrid,
-                verbose=FALSE)
-
-stopCluster(cluster)
-registerDoSEQ()
-XTREME$results[,c(7,8,10)]
-
-
-xgboostGrid <- expand.grid(eta=0.1,nrounds=500,
-                           max_depth=c(3,6,9),min_child_weight=1,gamma=c(.1,.5,1,5,10),
-                           colsample_bytree=c(0.6,0.8,1),subsample=c(0.6,0.8,1.0))
-dim(xgboostGrid) #135 models yikes
-cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
-registerDoParallel(cluster)
-XTREME <- train(x=TRAINXGB,y=SUBTRAIN$Churn,
-                method="xgbTree",
-                trControl=fitControl,
-                tuneGrid=xgboostGrid,
-                verbose=TRUE)
-stopCluster(cluster)
-registerDoSEQ()
-
-TUNE <- XTREME$results[,c(2,3,4,6,8,10)]
-head( TUNE[order(TUNE$ROC,decreasing=TRUE),], 15 )
-
-
-
-xgboostGrid <- expand.grid(eta=0.01,nrounds=c(250,500,1000,2500,5000),
-                           max_depth=9,min_child_weight=1,gamma=1,colsample_bytree=1,subsample=.6)
-FINE.XTREME <- train(x=TRAINXGB,y=SUBTRAIN$Churn,
-                     method="xgbTree",
-                     trControl=fitControl,
-                     tuneGrid=xgboostGrid,
-                     verbose=FALSE)
-
-
-
-
-
-predict <- predict(XTREME,newdata=SUBHOLDOUT,type=)
-xgboost.predictions <- predict(XTREME,newdata=HOLDOUT,type="prob")
-
-GBMfit.predictions <- predict(GBMfit,newdata=HOLDOUT,type="prob")
-dim(xgboost.predictions)
-xgboost.predictions$CustomerID <- HOLDOUT$CustomerID
-xgboost.predictions$Churn <- xgboost.predictions$Yes
-xgboost.predictions <- xgboost.predictions[-c(1:2)]
-head(xgboost.predictions)
-dim(xgboost.predictions)
-
-
-write.csv(xgboost.predictions,file="SineenartFinalPredictionXGBoost.csv",row.names = FALSE)
 
