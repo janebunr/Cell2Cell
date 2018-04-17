@@ -270,6 +270,7 @@ SUBTRAIN <- FULLTRAIN[subtrain.rows,]
 SUBHOLDOUT <- FULLTRAIN[-subtrain.rows,]
 
 
+                                                          
 ######################################### PREDICTIVE MODEL ######################################### 
 ######################################### ######################################### ######################################### 
 ######################################### ######################################### ######################################### 
@@ -299,7 +300,6 @@ RPARTfit$results[rownames(RPARTfit$bestTune),] #0.8749798  #not so good   ######
 plot(ROC~cp,data=RPARTfit$results,log="x")  #If tuned on AUC
 
 BEST$RPARTfit<-RPARTfit$bestTune
-
 RPART.predictions <- predict(RPARTfit,newdata=HOLDOUT,type="prob")
 
 
